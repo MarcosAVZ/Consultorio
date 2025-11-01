@@ -222,8 +222,10 @@ python -m venv .venv
 
 ```bash
 python -m pip install --upgrade pip
+cd consultorio
 pip install -r requirements.txt
 ```
 ### 4) Ejecutar la aplicación (desde la raíz del repo)
 ```bash
-python -m app.main
+python cd app
+python main.py

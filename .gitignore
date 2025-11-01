@@ -1,0 +1,14 @@
+# Entorno y Python cache
+.venv/
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Artefactos locales de la app
+PDFs/
+imagenes/
+*.db
+token.json
+client_secrets.json

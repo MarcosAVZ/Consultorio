@@ -1,13 +1,17 @@
-# main.py
+# main.py — Opción A (importar el módulo actions completo, sin paquete 'app')
+
 import tkinter as tk
 from tkinter import messagebox
 
+import actions  # 👈 importás el MÓDULO entero
 from paths import get_paths
 from db import init_db
-from ui import build_form, build_actions, build_table, bind_context_menu, cargar_desde_tabla
-from actions import (refresh_table, apply_filter, guardar, actualizar, borrar,
-                     export_csv, generar_pdf_action, backup_now_action)
+from ui import (
+    build_form, build_actions, build_table,
+    bind_context_menu, cargar_desde_tabla, clear_form
+)
 from backup_drive import can_backup
+
 
 def main():
     paths = get_paths()
@@ -23,13 +27,13 @@ def main():
 
     # Botonera
     btn_bkp = build_actions(form_frame, handlers={
-        "guardar":   lambda: guardar(cur, conn, fields, on_done=lambda: refresh_table(table, cur)),
-        "actualizar":lambda: actualizar(cur, conn, table, fields, on_done=lambda: refresh_table(table, cur)),
-        "borrar":    lambda: borrar(cur, conn, table, on_done=lambda: refresh_table(table, cur), fields=fields),
-        "pdf":       lambda: generar_pdf_action(paths, table),
-        "limpiar":   lambda: [w.delete(0, tk.END) if hasattr(w, 'delete') else None for w in fields.values()],
-        "csv":       lambda: export_csv(cur),
-        "backup":    lambda: backup_now_action(paths),
+        "guardar":    lambda: actions.guardar(cur, conn, fields, on_done=lambda: actions.refresh_table(table, cur)),
+        "actualizar": lambda: actions.actualizar(cur, conn, table, fields, on_done=lambda: actions.refresh_table(table, cur)),
+        "borrar":     lambda: actions.borrar(cur, conn, table, on_done=lambda: actions.refresh_table(table, cur), fields=fields),
+        "pdf":        lambda: actions.generar_pdf_action(paths, table),  # 👈 ahora sí: actions.<función>
+        "limpiar":    lambda: clear_form(fields),
+        "csv":        lambda: actions.export_csv(cur),
+        "backup":     lambda: actions.backup_now_action(paths),
     })
     if not can_backup(paths):
         btn_bkp.state(["disabled"])
@@ -40,16 +44,18 @@ def main():
 
     # Buscar/filtrar
     def _apply_filter(*_):
-        apply_filter(table, cur, q_var.get().strip(), crit_var.get())
+        actions.apply_filter(table, cur, q_var.get().strip(), crit_var.get())
+
     root.bind_all("<Return>", lambda e: _apply_filter() if e.widget is not root else None)
 
     # Menú contextual
     bind_context_menu(root, list(fields.values()))
 
     # Datos iniciales
-    refresh_table(table, cur)
+    actions.refresh_table(table, cur)
 
     root.mainloop()
+
 
 if __name__ == "__main__":
     try:

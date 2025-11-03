@@ -97,7 +97,7 @@ def build_table(root):
     # tabla + scrolls
     yb = ttk.Scrollbar(right, orient="vertical")
     xb = ttk.Scrollbar(right, orient="horizontal")
-    table = ttk.Treeview(right, columns=COLUMNS, show="headings", yscrollcommand=yb.set, xscrollcommand=xb.set)
+    table = ttk.Treeview(right, columns=COLUMNS, show="headings", yscrollcommand=yb.set, xscrollcommand=xb.set, selectmode="browse")
     yb.config(command=table.yview); xb.config(command=table.xview)
     table.pack(side=tk.TOP, fill=tk.BOTH, expand=True); yb.pack(side=tk.RIGHT, fill=tk.Y); xb.pack(side=tk.BOTTOM, fill=tk.X)
 

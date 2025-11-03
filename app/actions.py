@@ -94,11 +94,23 @@ def export_csv(cur):
     messagebox.showinfo("CSV", f"Se exportaron {len(rows)} filas a:\n{path}")
 
 def generar_pdf_action(paths, table):
-    sel = table.focus()
-    if not sel:
-        return messagebox.showwarning("Atención","Seleccioná una historia para generar PDF")
-    out = generar_pdf(paths, table.item(sel,'values'))
-    messagebox.showinfo("PDF", f"PDF guardado en:\n{out}")
+    # Asegura UNA selección
+    sels = table.selection()
+    if len(sels) != 1:
+        messagebox.showwarning("Atención", "Seleccioná exactamente una historia")
+        return
+
+    row_values = table.item(sels[0], 'values')
+    if not row_values:
+        messagebox.showwarning("Atención", "No se pudo leer la fila seleccionada")
+        return
+
+    try:
+        out = generar_pdf(paths, row_values)
+        messagebox.showinfo("PDF", f"PDF guardado en:\n{out}")
+    except Exception as e:
+        messagebox.showerror("Error PDF", f"No se pudo generar el PDF:\n{e}")
+
 
 def backup_now_action(paths):
     if not can_backup(paths):

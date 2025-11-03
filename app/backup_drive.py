@@ -16,7 +16,10 @@ def backup_now(paths: dict):
         raise RuntimeError("No está disponible PyDrive2 o falta client_secrets.json")
 
     gauth = GoogleAuth()
+    gauth.LoadClientConfigFile(paths["CLIENT_SECRETS"])
+    
     gauth.LoadCredentialsFile(paths["TOKEN_FILE"])
+    
     if gauth.credentials is None:
         gauth.LocalWebserverAuth()
     elif gauth.access_token_expired:

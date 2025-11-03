@@ -17,9 +17,33 @@ def main():
     root.title("Consultorio Gerontológico Integral - Dra. Zulma Cabrera")
     root.geometry("1200x700")
 
-    # UI
-    form_frame, fields = build_form(root)
-    right, table, q_var, crit_var = build_table(root)
+    # === SCROLL PRINCIPAL ===
+    main_canvas = tk.Canvas(root)
+    main_scroll = tk.Scrollbar(root, orient="vertical", command=main_canvas.yview)
+    scrollable_frame = tk.Frame(main_canvas)
+
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: main_canvas.configure(
+            scrollregion=main_canvas.bbox("all")
+        )
+    )
+
+    main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    main_canvas.configure(yscrollcommand=main_scroll.set)
+
+    main_canvas.pack(side="left", fill="both", expand=True)
+    main_scroll.pack(side="right", fill="y")
+    
+    def _on_mousewheel(event):
+        main_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    root.bind_all("<MouseWheel>", _on_mousewheel)
+
+# === CONTENIDO DE LA INTERFAZ ===
+    form_frame, fields = build_form(scrollable_frame)
+    right, table, q_var, crit_var = build_table(scrollable_frame)
+
 
     # Botonera
     btn_bkp = build_actions(form_frame, handlers={

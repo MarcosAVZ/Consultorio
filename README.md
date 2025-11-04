@@ -1,3 +1,6 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/MarcosAVZ/Consultorio)
+
+
 # Consultorio Gerontológico Integral — Historias Clínicas (Tkinter + SQLite)
 
 Aplicación de escritorio para gestionar **historias clínicas**. Permite **crear, editar, buscar, eliminar**, **exportar a PDF/CSV** y realizar **backups opcionales** en Google Drive (PyDrive2).

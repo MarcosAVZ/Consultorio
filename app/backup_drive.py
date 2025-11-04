@@ -35,6 +35,7 @@ def backup_now(paths: dict):
 
     # Cargar credenciales previas si existen
     gauth.LoadCredentialsFile(paths["TOKEN_FILE"])
+    
     if gauth.credentials is None:
         # Primera vez: abre el navegador
         gauth.LocalWebserverAuth()

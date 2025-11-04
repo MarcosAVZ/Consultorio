@@ -103,31 +103,54 @@ class PDF(FPDF):
 
 
 # ------------------------- Layout -------------------------
+# --- en pdf_utils.py, reemplaza _header por esto ---
 def _header(pdf: PDF, paths: dict, nombre: str, FONT_BOLD: tuple, FONT_REG: tuple, norm):
     pdf.set_margins(15, 15, 15)
     pdf.add_page()
     content_w = pdf.w - pdf.l_margin - pdf.r_margin
 
+    # Medidas/espaciado del bloque de cabecera
+    GAP = 6          # separación entre logo y texto
+    LOGO_W = 26      # ancho del logo (fijo)
+    LOGO_H = 26      # alto reservado (para asegurar espacio)
+
     y0 = pdf.get_y()
+
+    # Logo (no cambia el cursor)
+    has_logo = False
     if PIL_AVAILABLE and os.path.exists(paths.get("LOGO_PATH", "")):
         try:
-            pdf.image(paths["LOGO_PATH"], x=pdf.l_margin, y=y0, w=22)
+            pdf.image(paths["LOGO_PATH"], x=pdf.l_margin, y=y0, w=LOGO_W)
+            has_logo = True
         except Exception:
             pass
 
-    pdf.set_xy(pdf.l_margin + 26, y0)
-    pdf.set_font(*FONT_BOLD, size=14)
-    pdf.cell(w=content_w - 26, h=6, txt=norm(TITLE), ln=1)
+    text_x = pdf.l_margin + (LOGO_W + GAP if has_logo else 0)
 
+    # Título
+    pdf.set_xy(text_x, y0)
+    pdf.set_font(*FONT_BOLD, size=14)
+    pdf.cell(w=content_w - (text_x - pdf.l_margin), h=6, txt=norm(TITLE), ln=1)
+
+    # Subtítulo (¡mover X otra vez! si no, vuelve al margen)
+    pdf.set_x(text_x)
     pdf.set_font(*FONT_REG, size=11)
     pdf.set_text_color(100, 100, 100)
-    pdf.cell(w=content_w - 26, h=5, txt=norm(f"Historia Clínica - {nombre}"), ln=1)
+    pdf.cell(w=content_w - (text_x - pdf.l_margin), h=5, txt=norm(f"Historia Clínica - {nombre}"), ln=1)
     pdf.set_text_color(0, 0, 0)
 
-    pdf.ln(4)
+    # Reservar altura: que la línea quede debajo del logo o del bloque de texto
+    text_block_h = 6 + 5   # alto usado por título + subtítulo
+    reserved_h = max(LOGO_H, text_block_h)
+    pdf.set_y(y0 + reserved_h + 3)
+
+    # Línea separadora
     pdf.set_draw_color(200, 200, 200)
     pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
-    pdf.ln(3)
+    pdf.ln(4)
+
+
+
 
 # --- NUEVA versión POSICIONAL ---
 def _kv_row_at(pdf, x: float, y: float, label: str, value: str,

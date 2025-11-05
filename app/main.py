@@ -19,7 +19,8 @@ def main():
 
     root = tk.Tk()
     root.title("Consultorio Gerontológico Integral - Dra. Zulma Cabrera")
-    root.geometry("1200x700")
+    root.state('zoomed')      # maximiza la ventana
+
 
     # === SCROLL PRINCIPAL ===
     main_canvas = tk.Canvas(root)

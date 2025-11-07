@@ -1,12 +1,16 @@
 # ui.py
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import scrolledtext
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 
 COLUMNS = (
     "id","nombre","dni","edad","domicilio","obra_social","numero_beneficio",
     "telefono","email","antecedentes_personales","antecedentes_familiares",
     "examen_fisico","diagnostico_presuntivo","evolucion_seguimiento","motivo_consulta"
 )
+
+VISIBLE_COLUMNS = {"nombre","dni","edad","domicilio","obra_social","telefono","email"}
 
 HEADERS = {
     "id":"ID","nombre":"Nombre","dni":"DNI","edad":"Edad","domicilio":"Domicilio",
@@ -15,23 +19,36 @@ HEADERS = {
     "examen_fisico":"Examen Físico","diagnostico_presuntivo":"Diagnóstico Presuntivo",
     "evolucion_seguimiento":"Evolución/Seguimiento","motivo_consulta":"Motivo Consulta"
 }
+
+# Más anchas para dar "aire" visual
 WIDTHS = {
-    "id":60,"nombre":160,"dni":110,"edad":60,"domicilio":180,"obra_social":120,"numero_beneficio":120,
-    "telefono":110,"email":160,"antecedentes_personales":220,"antecedentes_familiares":220,
-    "examen_fisico":220,"diagnostico_presuntivo":220,"evolucion_seguimiento":240,"motivo_consulta":200
+    "id":60,
+    "nombre":240, "dni":130, "edad":80, "domicilio":260, "obra_social":160,
+    "numero_beneficio":120, "telefono":140, "email":230,
+    "antecedentes_personales":220, "antecedentes_familiares":220,
+    "examen_fisico":220, "diagnostico_presuntivo":220,
+    "evolucion_seguimiento":240, "motivo_consulta":200
 }
 
 def build_form(parent):
-    frame = ttk.Frame(parent, padding=10); frame.pack(side=tk.LEFT, fill=tk.Y)
+    frame = ttk.Frame(parent, padding=16)
+    frame.pack(side=tk.LEFT, fill=tk.Y)
 
-    def fila_entry(row, label, width=30):
-        ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0,6), pady=3)
-        e = ttk.Entry(frame, width=width); e.grid(row=row, column=1, sticky="ew", pady=3); return e
+    def fila_entry(row, label, width=32):
+        ttk.Label(frame, text=label, bootstyle="secondary").grid(
+            row=row, column=0, sticky="w", padx=(0,10), pady=6
+        )
+        e = ttk.Entry(frame, width=width)
+        e.grid(row=row, column=1, sticky="ew", pady=6)
+        return e
 
-    def fila_text(row, label, height=4, width=40):
-        ttk.Label(frame, text=label).grid(row=row, column=0, sticky="nw", padx=(0,6), pady=(8,3))
+    def fila_text(row, label, height=4, width=44):
+        ttk.Label(frame, text=label, bootstyle="secondary").grid(
+            row=row, column=0, sticky="nw", padx=(0,10), pady=(12,6)
+        )
         t = scrolledtext.ScrolledText(frame, width=width, height=height, wrap=tk.WORD)
-        t.grid(row=row, column=1, sticky="ew", pady=(8,3)); return t
+        t.grid(row=row, column=1, sticky="ew", pady=(12,6))
+        return t
 
     fields = {
         "nombre": fila_entry(0, "Nombre"),
@@ -70,48 +87,73 @@ def clear_form(fields):
             w.delete(0, tk.END)
 
 def build_actions(parent, handlers):
-    actions = ttk.Frame(parent, padding=(0,10,0,0))
+    actions = ttk.Frame(parent, padding=(0,16,0,0))
     actions.grid(row=14, column=0, columnspan=2, sticky="ew")
-    actions.columnconfigure(0, weight=1); actions.columnconfigure(1, weight=1)
+    actions.columnconfigure(0, weight=1)
+    actions.columnconfigure(1, weight=1)
 
-    ttk.Button(actions, text="Guardar",     command=handlers["guardar"]).grid(   row=0, column=0, sticky="ew", padx=(0,6), pady=4)
-    ttk.Button(actions, text="Actualizar",  command=handlers["actualizar"]).grid(row=0, column=1, sticky="ew", padx=(6,0), pady=4)
-    ttk.Button(actions, text="Borrar",      command=handlers["borrar"]).grid(    row=1, column=0, sticky="ew", padx=(0,6), pady=4)
-    ttk.Button(actions, text="Generar PDF", command=handlers["pdf"]).grid(       row=1, column=1, sticky="ew", padx=(6,0), pady=4)
-    ttk.Button(actions, text="Limpiar",     command=handlers["limpiar"]).grid(   row=2, column=0, columnspan=2, sticky="ew", pady=(6,0))
-    ttk.Button(actions, text="Exportar CSV",command=handlers["csv"]).grid(       row=3, column=0, sticky="ew", padx=(0,6), pady=4)
-    btn_bkp = ttk.Button(actions, text="Backup ahora", command=handlers["backup"])
-    btn_bkp.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(6,0))
-    return btn_bkp
+    # Paleta sobria: primary/secondary y solo danger para borrar
+    ttk.Button(actions, text="Guardar",     command=handlers["guardar"],     bootstyle="primary").grid(row=0, column=0, sticky="ew", padx=(0,8), pady=8)
+    ttk.Button(actions, text="Actualizar",  command=handlers["actualizar"],  bootstyle="secondary").grid(row=0, column=1, sticky="ew", padx=(8,0), pady=8)
+
+    ttk.Button(actions, text="Borrar",      command=handlers["borrar"],      bootstyle="danger").grid(   row=1, column=0, sticky="ew", padx=(0,8), pady=8)
+    ttk.Button(actions, text="Generar PDF", command=handlers["pdf"],         bootstyle="secondary").grid(row=1, column=1, sticky="ew", padx=(8,0), pady=8)
+
+    ttk.Button(actions, text="Limpiar",     command=handlers["limpiar"]).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10,0))
+    return actions  # ya no devolvemos btn_bkp
 
 def build_table(root):
-    right = ttk.Frame(root, padding=10); right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+    right = ttk.Frame(root, padding=16)
+    right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-    # buscador
-    search_bar = ttk.Frame(right); search_bar.pack(side=tk.TOP, fill=tk.X, pady=(0,8))
-    tk.Label(search_bar, text="Buscar:").pack(side=tk.LEFT, padx=(0,6))
-    q_var = tk.StringVar(); ent = ttk.Entry(search_bar, textvariable=q_var, width=30); ent.pack(side=tk.LEFT)
+    # Buscador
+    search_bar = ttk.Frame(right)
+    search_bar.pack(side=tk.TOP, fill=tk.X, pady=(0,12))
+
+    ttk.Label(search_bar, text="Buscar:", bootstyle="secondary").pack(side=tk.LEFT, padx=(0,8))
+    q_var = tk.StringVar()
+    ttk.Entry(search_bar, textvariable=q_var, width=32).pack(side=tk.LEFT)
+
     crit_var = tk.StringVar(value="nombre")
-    ttk.Combobox(search_bar, textvariable=crit_var, width=12, state="readonly", values=["nombre","dni"]).pack(side=tk.LEFT, padx=6)
+    ttk.Combobox(
+        search_bar, textvariable=crit_var, width=14, state="readonly",
+        values=["nombre","dni"]
+    ).pack(side=tk.LEFT, padx=10)
 
-    # tabla + scrolls
+    # Tabla + scrolls
     yb = ttk.Scrollbar(right, orient="vertical")
     xb = ttk.Scrollbar(right, orient="horizontal")
-    table = ttk.Treeview(right, columns=COLUMNS, show="headings", yscrollcommand=yb.set, xscrollcommand=xb.set, selectmode="browse")
-    yb.config(command=table.yview); xb.config(command=table.xview)
-    table.pack(side=tk.TOP, fill=tk.BOTH, expand=True); yb.pack(side=tk.RIGHT, fill=tk.Y); xb.pack(side=tk.BOTTOM, fill=tk.X)
+
+    table = ttk.Treeview(
+        right,
+        columns=COLUMNS,
+        show="headings",
+        yscrollcommand=yb.set,
+        xscrollcommand=xb.set,
+        selectmode="browse",
+        bootstyle="secondary"
+    )
+    yb.config(command=table.yview)
+    xb.config(command=table.xview)
+
+    table.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+    yb.pack(side=tk.RIGHT, fill=tk.Y)
+    xb.pack(side=tk.BOTTOM, fill=tk.X)
 
     for c in COLUMNS:
         table.heading(c, text=HEADERS[c])
-        table.column(c, width=WIDTHS.get(c,120), anchor="w", stretch=True)
+        if c in VISIBLE_COLUMNS:
+            table.column(c, width=WIDTHS.get(c, 120), anchor="w", stretch=True)
+        else:
+            table.column(c, width=0, minwidth=0, stretch=False)
 
     return right, table, q_var, crit_var
 
 def cargar_desde_tabla(table, fields):
     sel = table.focus()
-    if not sel: return
-    data = table.item(sel,'values')
-    # entries
+    if not sel:
+        return
+    data = table.item(sel, 'values')
     fields["nombre"].delete(0, tk.END); fields["nombre"].insert(0, data[1])
     fields["dni"].delete(0, tk.END); fields["dni"].insert(0, data[2])
     fields["edad"].delete(0, tk.END); fields["edad"].insert(0, data[3])
@@ -121,12 +163,13 @@ def cargar_desde_tabla(table, fields):
     fields["telefono"].delete(0, tk.END); fields["telefono"].insert(0, data[7])
     fields["email"].delete(0, tk.END); fields["email"].insert(0, data[8])
     fields["motivo_consulta"].delete(0, tk.END); fields["motivo_consulta"].insert(0, data[14] or "")
-    # texts
     fields["antecedentes_personales"].delete("1.0", tk.END); fields["antecedentes_personales"].insert(tk.END, data[9] or "")
     fields["antecedentes_familiares"].delete("1.0", tk.END); fields["antecedentes_familiares"].insert(tk.END, data[10] or "")
     fields["examen_fisico"].delete("1.0", tk.END); fields["examen_fisico"].insert(tk.END, data[11] or "")
     fields["diagnostico_presuntivo"].delete("1.0", tk.END); fields["diagnostico_presuntivo"].insert(tk.END, data[12] or "")
     fields["evolucion_seguimiento"].delete("1.0", tk.END); fields["evolucion_seguimiento"].insert(tk.END, data[13] or "")
+
+
 
 def bind_context_menu(root, widgets):
     menu = tk.Menu(root, tearoff=0)

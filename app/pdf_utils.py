@@ -15,7 +15,10 @@ except Exception:
 # Detecta si fpdf2.MultiCell soporta el kw 'split_only_by_whitespace'
 _HAS_SPLIT = "split_only_by_whitespace" in inspect.signature(FPDF.multi_cell).parameters
 
-TITLE = "Consultorio Gerontológico Integral - Dra. Zulma Cabrera"
+TITLE = '''DRA. ZULMA PATRICIA CABRERA  Medicina General y Gerontología
+            M.P.: 6040; Av. Lavalle 1255 - 3500 Resistencia Chaco
+                            Teléfono: (+54) 362 5458329
+'''
 
 # ------------------------- helpers de texto -------------------------
 def _safe(s) -> str:
@@ -98,7 +101,7 @@ class PDF(FPDF):
         # fuente del footer (definida en generar_pdf)
         self.set_font(getattr(self, "_footer_font_name", "Arial"), "", 9)
         self.set_text_color(130, 130, 130)
-        txt = f"Generado: {datetime.datetime.now():%d/%m/%Y %H:%M}{sep}Página {self.page_no()}"
+        txt = f"Generado: {datetime.datetime.now():%d/%m/%Y }{sep}Página {self.page_no()}"
         self.cell(0, 8, txt, 0, 0, "R")
 
 
@@ -127,14 +130,14 @@ def _header(pdf: PDF, paths: dict, nombre: str, FONT_BOLD: tuple, FONT_REG: tupl
 
     text_x = pdf.l_margin + (LOGO_W + GAP if has_logo else 0)
 
-    # Título
+    # Título (alineado a la izquierda y con salto de línea)
     pdf.set_xy(text_x, y0)
-    pdf.set_font(*FONT_BOLD, size=14)
-    pdf.cell(w=content_w - (text_x - pdf.l_margin), h=6, txt=norm(TITLE), ln=1)
+    pdf.set_font(*FONT_BOLD, size=12)
+    pdf.multi_cell(w=content_w - (text_x - pdf.l_margin), h=6, txt=norm(TITLE), align='L')  # Usar multi_cell para varias líneas
 
     # Subtítulo (¡mover X otra vez! si no, vuelve al margen)
     pdf.set_x(text_x)
-    pdf.set_font(*FONT_REG, size=11)
+    pdf.set_font(*FONT_REG, size=10)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(w=content_w - (text_x - pdf.l_margin), h=5, txt=norm(f"Historia Clínica - {nombre}"), ln=1)
     pdf.set_text_color(0, 0, 0)
@@ -148,6 +151,7 @@ def _header(pdf: PDF, paths: dict, nombre: str, FONT_BOLD: tuple, FONT_REG: tupl
     pdf.set_draw_color(200, 200, 200)
     pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(4)
+
 
 
 

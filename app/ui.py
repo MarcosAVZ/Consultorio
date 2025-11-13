@@ -2,8 +2,10 @@
 import csv
 import datetime as dt
 import flet as ft
-import actions as ACT
+#import actions as ACT
+
 from backup_drive import can_backup,backup_now
+from actions import *
 
 
 # --- Constantes y columnas de la BD (mismo orden que en db.py/ui.py) ---
@@ -24,7 +26,8 @@ HEADERS = {
 def make_app(page: ft.Page, conn, cur, paths):
     # ---------- Setup ----------
 
-
+    print("[DEBUG] can_backup:", can_backup(paths))
+    
     page.title = "Consultorio Gerontológico Integral - Dra. Zulma Cabrera"
     page.window_maximized = True
     page.theme_mode = "light"
@@ -191,6 +194,7 @@ def make_app(page: ft.Page, conn, cur, paths):
     
 
 
+#----------
     # CSV con FilePicker
     fp = ft.FilePicker()
     page.overlay.append(fp)
@@ -209,97 +213,6 @@ def make_app(page: ft.Page, conn, cur, paths):
         fp.on_save = save_result
         fp.save_file(file_name=suggested, allowed_extensions=["csv"])
 
-
-    def borrar_directo_action(e=None):
-        values = selected_row_values.get("values")
-        if not values:
-            print("[DEBUG] No tiene valor deberia aparecer el snackbar")
-            _notify("Seleccioná una fila primero")
-            return
-        try:
-            row_id = int(values[0])
-            cur.execute("DELETE FROM historias WHERE id=?", (row_id,))
-            print("[DEBUG] rowcount after DELETE:", cur.rowcount)
-            conn.commit()
-            clear_form()
-            refresh_table()
-            _notify("Historia clínica eliminada")
-        except Exception as ex:
-            _notify(f"Error al borrar: {ex}")
-   
-    #def close_banner(_=None):
-     #   if getattr(page, "banner", None):
-      #      page.banner.open = False
-       #     page.update()
-    
-    def _notify(msg: str):
-        try:
-            page.show_snack_bar(ft.SnackBar(ft.Text(msg)))
-        except Exception:
-            # Fallback si tu versión no tiene show_snack_bar
-            page.snack_bar = ft.SnackBar(ft.Text(msg), open=True)
-            page.update()
-            
-   
-    def borrar_action(e=None):
-        print("[DEBUG] tocastes bonton borrar")
-        values = selected_row_values.get("values")
-        if not values:
-            print("[DEBUG] No valor")
-            _notify("Seleccioná una fila primero")
-            return
-
-        row_id = int(values[0])
-
-        page.banner = ft.Banner(
-            content=ft.Text(f"¿Querés borrar la historia con ID {row_id}?"),
-            actions=[
-                ft.TextButton("Cancelar", on_click=close_banner),
-                ft.ElevatedButton("Borrar", on_click=lambda ev: (close_banner(), borrar_directo_action(ev))),
-            ],
-        )
-        page.banner.open = True
-        page.update()
-
-
-    def accionBorrar(page, borrar_directo_action):
-        page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-
-        def cerrar_banner(e):
-            page.close(banner)
-
-        def confirmar_borrado(e):
-            page.close(banner)
-            borrar_directo_action()  # Llama a la función que realmente borra
-
-        banner = ft.Banner(
-            bgcolor=ft.Colors.AMBER_100,
-            leading=ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.AMBER, size=40),
-            content=ft.Text(
-                value="¿Estás seguro de que querés eliminar este registro?",
-                color=ft.Colors.BLACK,
-            ),
-            actions=[
-                ft.TextButton(text="Cancelar", on_click=cerrar_banner),
-                ft.TextButton(text="Borrar", style=ft.ButtonStyle(color=ft.Colors.RED), on_click=confirmar_borrado),
-            ],
-        )
-
-        page.open(banner)
-
-    # Llamamos a tu actions con todos los argumentos que necesita
-   # ACT.borrar(cur, conn, selected_row_values, clear_form, after_refresh, page)
-    # Si hubiera excepción dentro, la vas a ver en consola por ahora.
-
-    def backup_action(_=None):
-        if not can_backup(paths):
-            page.dialog = ft.AlertDialog(title=ft.Text("Backup"), content=ft.Text("Falta PyDrive2 o client_secrets.json")); page.dialog.open=True; page.update(); return
-        try:
-            backup_now(paths)
-            page.snack_bar = ft.SnackBar(ft.Text("Copia de seguridad subida a Google Drive"), open=True); page.update()
-        except Exception as ex:
-            page.dialog = ft.AlertDialog(title=ft.Text("Backup"), content=ft.Text(f"Error: {ex}")); page.dialog.open=True; page.update()
-
     # ---------- Layout ----------
     # Columna izquierda (form) con scroll
     left_form = ft.Column(
@@ -307,19 +220,19 @@ def make_app(page: ft.Page, conn, cur, paths):
             tf_nombre, tf_dni, tf_edad, tf_dom, tf_obra, tf_benef, tf_tel, tf_email, tf_motivo,
             ta_ant_pers, ta_ant_fam, ta_examen, ta_diag, ta_evol,
             ft.Row([
-                ft.ElevatedButton("Guardar",on_click=lambda e: ACT.guardar(cur, conn, get_form_data, clear_form, after_refresh, page), expand=1),
-                ft.ElevatedButton("Actualizar",on_click=lambda e: ACT.actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_refresh, page), expand=1),
+                ft.ElevatedButton("Guardar",on_click=lambda e: guardar(cur, conn, get_form_data, clear_form, after_refresh, page), expand=1),
+                ft.ElevatedButton("Actualizar",on_click=lambda e: actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_refresh, page), expand=1),
             ], spacing=10),
             ft.Row([
-                ft.ElevatedButton("Borrar",on_click=lambda e: accionBorrar(page, borrar_directo_action), expand=1),
-                ft.ElevatedButton("Generar PDF",on_click=lambda e: ACT.generar_pdf_action(paths, selected_row_values, page), expand=1),
+                ft.ElevatedButton("Borrar",on_click=lambda e: accionBorrar(page, selected_row_values, cur, conn, clear_form, after_refresh), expand=1),
+                ft.ElevatedButton("Generar PDF",on_click=lambda e: generar_pdf_action(paths, selected_row_values, page), expand=1),
             ], spacing=10),
             ft.Row([
                 ft.ElevatedButton("Limpiar", on_click=lambda e: clear_form(), expand=1),
-                ft.ElevatedButton("Exportar CSV",on_click=lambda e: ACT.export_csv(cur, page, fp), expand=1),
+                ft.ElevatedButton("Exportar CSV",on_click=lambda e: export_csv(cur, page, fp), expand=1),
             ], spacing=10),
             
-            ft.ElevatedButton("Backup ahora",on_click=lambda e: ACT.backup_now_action(paths, page),disabled=not can_backup(paths)),
+            ft.ElevatedButton("Backup ahora",on_click=lambda e: backup_now_action(paths, page),disabled=not can_backup(paths)),
         ],
         
         expand=True,

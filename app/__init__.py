@@ -11,7 +11,7 @@ from .ui import (
 )
 from .actions import (
     refresh_table, apply_filter, guardar, actualizar, borrar,
-    export_csv, generar_pdf_action, backup_now_action
+    export_csv, generar_pdf_action, backup_now_action,
 )
 from .backup_drive import can_backup
 

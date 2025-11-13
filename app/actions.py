@@ -8,16 +8,7 @@ from backup_drive import backup_now, can_backup
 
 # ---------------- Tabla ----------------
 
-def refresh_table(cur, table_set_rows):
-    cur.execute("SELECT * FROM historias")
-    table_set_rows(cur.fetchall())
-
-def apply_filter(cur, table_set_rows, q: str, crit: str):
-    if q:
-        cur.execute(f"SELECT * FROM historias WHERE {crit} LIKE ?", (f"%{q}%",))
-    else:
-        cur.execute("SELECT * FROM historias")
-    table_set_rows(cur.fetchall())
+#se podria agregar aqui los refresh , no lo se la verdad
 
 # ---------------- CRUD ----------------
 
@@ -69,24 +60,46 @@ def actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_
     clear_form(); after_refresh()
     _info(page, "Éxito", "Historia clínica actualizada")
 
-def borrar(cur, conn, selected_row_values, clear_form, after_refresh, page: ft.Page):
-    values = selected_row_values.get("values")
-    if not values:
-        _warn(page, "Atención", "Seleccioná una historia para borrar"); return
+def accionBorrar(page,selected_row_values,cur, conn,clear_form,after_refresh):
+        page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+        values = selected_row_values.get("values")
+        def cerrar_banner(e):
+            page.close(banner)
 
-    def _do_delete(_e):
-        try:
-            row_id = int(values[0])
-            cur.execute("DELETE FROM historias WHERE id=?", (row_id,))
-            conn.commit()
-            clear_form(); after_refresh()
-            _snack(page, "Historia clínica eliminada")
-        except Exception as ex:
-            _err(page, "Error al borrar", str(ex))
-        finally:
-            _close_dialog(page)
+        def confirmar_borrado(e):
+            page.close(banner)
+            
+            if not values:
+                print("[DEBUG] No tiene valor deberia aparecer el snackbar")
+                _notify("Seleccioná una fila primero", page)
+                return
+            try:
+                row_id = int(values[0])
+                cur.execute("DELETE FROM historias WHERE id=?", (row_id,))
+                print("[DEBUG] rowcount after DELETE:", cur.rowcount)
+                conn.commit()
+                clear_form()
+                after_refresh()
+                _notify("Historia clínica eliminada", page)
+            except Exception as ex:
+                _notify(f"Error al borrar: {ex}", page)
+              
 
-    _confirm(page, "Confirmar", "¿Querés borrar esta historia clínica?", _do_delete)
+        banner = ft.Banner(
+            bgcolor=ft.Colors.AMBER_100,
+            leading=ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.AMBER, size=40),
+            content=ft.Text(
+                value="¿Estás seguro de que querés eliminar este registro?",
+                color=ft.Colors.BLACK,
+            ),
+            actions=[
+                ft.TextButton(text="Cancelar", on_click=cerrar_banner),
+                ft.TextButton(text="Borrar", style=ft.ButtonStyle(color=ft.Colors.RED), on_click=confirmar_borrado),
+            ],
+        )
+
+        page.open(banner)
+
 
 # ---------------- Exportar / PDF / Backup ----------------
 
@@ -99,7 +112,7 @@ def export_csv(cur, page: ft.Page, file_picker: ft.FilePicker):
         if not e.path: return
         with open(e.path, "w", encoding="utf-8-sig", newline="") as f:
             w = csv.writer(f, delimiter=";"); w.writerow(headers); w.writerows(rows)
-        _snack(page, f"Se exportaron {len(rows)} filas a:\n{e.path}")
+        _notify(page, f"Se exportaron {len(rows)} filas a:\n{e.path}")
 
     file_picker.on_save = save_result
     file_picker.save_file(file_name=suggested, allowed_extensions=["csv"])
@@ -110,21 +123,37 @@ def generar_pdf_action(paths, selected_row_values, page: ft.Page):
         _warn(page, "Atención", "Seleccioná una historia para generar PDF"); return
     try:
         out = generar_pdf(paths, values)
-        _snack(page, f"PDF guardado en:\n{out}")
+        _notify(page, f"PDF guardado en:\n{out}")
     except Exception as ex:
         _err(page, "Error PDF", str(ex))
 
 def backup_now_action(paths, page: ft.Page):
+    print("[DEBUG] Se toco el boton backup")
     if not can_backup(paths):
-        _warn(page, "Backup", "Falta PyDrive2 o client_secrets.json"); return
+        print("[DEBUG] No tiene pydrive2 o client_secrets,json")
+        _notify(page,"Falta PyDrive2 o client_secrets.json"); return
     try:
         backup_now(paths)
-        _snack(page, "Copia de seguridad subida a Google Drive")
+        print("[DEBUG] entro en de copia de seguridad")
+        _notify(page, "Copia de seguridad subida a Google Drive")
     except Exception as ex:
         _err(page, "Backup", str(ex))
 
 # ---------------- Helpers UI (Flet) ----------------
 
+def _notify(msg: str,page: ft.Page):
+        try:
+            page.open(ft.SnackBar(ft.Text(msg)))
+            page.update()
+        except Exception:
+            
+            page.open(ft.SnackBar(ft.Text(msg), open=True))
+            page.update()
+
+
+
+
+#-------------------------
 def _info(page: ft.Page, title: str, msg: str):
     page.dialog = ft.AlertDialog(title=ft.Text(title), content=ft.Text(msg))
     page.dialog.open = True

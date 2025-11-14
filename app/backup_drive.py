@@ -60,13 +60,14 @@ def backup_now(paths: dict):
 
     drive = GoogleDrive(gauth)
     
-    #logica zip
+
+# Lógica zip (igual que antes)
     zip_name = f"Backup_{datetime.datetime.now():%Y%m%d_%H%M%S}.zip"
     zip_path = os.path.join(paths["BASE_DIR"], zip_name)
 
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(paths["DB_NAME"], arcname=os.path.basename(paths["DB_NAME"]))
-
+        
     q = f"title='{paths['DRIVE_FOLDER_NAME']}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     flist = drive.ListFile({'q': q}).GetList()
     if flist:
@@ -76,6 +77,22 @@ def backup_now(paths: dict):
         folder.Upload()
         folder_id = folder['id']
 
+
+    # Subida al Drive
     f = drive.CreateFile({'title': zip_name, 'parents':[{'id': folder_id}]})
-    f.SetContentFile(zip_path); f.Upload()
-    os.remove(zip_path)
+    f.SetContentFile(zip_path)
+    f.Upload()
+    print("[DEBUG] Archivo subido a Drive:", zip_path)
+
+    # Asegurar que todos los handles de archivo están cerrados → liberamos manualmente
+    try:
+        del f  # eliminar referencia
+    except NameError:
+        pass
+
+    # Intentar eliminar el zip local
+    try:
+        os.remove(zip_path)
+        print("[DEBUG] Archivo zip local eliminado:", zip_path)
+    except Exception as ex:
+        print("[DEBUG] Error al borrar localmente el zip:", zip_path, ex)

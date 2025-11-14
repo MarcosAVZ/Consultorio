@@ -13,10 +13,12 @@ from backup_drive import backup_now, can_backup
 # ---------------- CRUD ----------------
 
 def guardar(cur, conn, get_form_data, clear_form, after_refresh, page: ft.Page):
+    print("[DEBUG] Se toco el boton guardar")
     data = get_form_data()
     ok, msg = validar_campos(data)
     if not ok:
-        _warn(page, "Validación", msg); return
+        print("[DEBUG] no pasa la validacion")
+        _notify(f"Validación {msg}", page); return
 
     ordered = (
         data["nombre"], data["dni"], data["edad"], data["domicilio"], data["obra_social"],
@@ -32,18 +34,19 @@ def guardar(cur, conn, get_form_data, clear_form, after_refresh, page: ft.Page):
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", ordered)
     conn.commit()
     clear_form(); after_refresh()
-    _info(page, "Éxito", "Historia clínica guardada")
+    print("[DEBUG] Se guardo el nuevo paciente")
+    _notify("Historia clínica guardada",page)
 
 def actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_refresh, page: ft.Page):
     values = selected_row_values.get("values")
     if not values:
-        _warn(page, "Atención", "Seleccioná una historia para actualizar"); return
+        _notify( "ATENCIÓN: Seleccioná una historia para actualizar",page); return
     row_id = int(values[0])
 
     data = get_form_data()
     ok, msg = validar_campos(data)
     if not ok:
-        _warn(page, "Validación", msg); return
+        _notify(f"Validación {msg}", page); return
 
     ordered = (
         data["nombre"], data["dni"], data["edad"], data["domicilio"], data["obra_social"],
@@ -58,7 +61,7 @@ def actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_
         evolucion_seguimiento=?, motivo_consulta=? WHERE id=?""", ordered)
     conn.commit()
     clear_form(); after_refresh()
-    _info(page, "Éxito", "Historia clínica actualizada")
+    _notify( "Historia clínica actualizada", page)
 
 def accionBorrar(page,selected_row_values,cur, conn,clear_form,after_refresh):
         page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
@@ -127,7 +130,7 @@ def generar_pdf_action(paths, selected_row_values, page: ft.Page):
     except Exception as ex:
         _err(page, "Error PDF", str(ex))
 
-def backup_now_action(paths, page: ft.Page):
+def backup_now_action(paths, page):
     print("[DEBUG] Se toco el boton backup")
     if not can_backup(paths):
         print("[DEBUG] No tiene pydrive2 o client_secrets,json")
@@ -135,32 +138,21 @@ def backup_now_action(paths, page: ft.Page):
     try:
         backup_now(paths)
         print("[DEBUG] entro en de copia de seguridad")
-        _notify(page, "Copia de seguridad subida a Google Drive")
+        _notify("Copia de seguridad subida a Google Drive", page)
     except Exception as ex:
         _err(page, "Backup", str(ex))
 
 # ---------------- Helpers UI (Flet) ----------------
 
-def _notify(msg: str,page: ft.Page):
+def _notify(msg: str, page: ft.Page):
         try:
             page.open(ft.SnackBar(ft.Text(msg)))
             page.update()
         except Exception:
-            
             page.open(ft.SnackBar(ft.Text(msg), open=True))
             page.update()
-
-
-
-
+            
 #-------------------------
-def _info(page: ft.Page, title: str, msg: str):
-    page.dialog = ft.AlertDialog(title=ft.Text(title), content=ft.Text(msg))
-    page.dialog.open = True
-    page.update()
-
-def _snack(page: ft.Page, msg: str):
-    page.snack_bar = ft.SnackBar(ft.Text(msg), open=True); page.update()
 
 def _warn(page: ft.Page, title: str, msg: str):
     page.dialog = ft.AlertDialog(title=ft.Text(title), content=ft.Text(msg))

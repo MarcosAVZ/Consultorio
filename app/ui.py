@@ -31,21 +31,8 @@ def make_app(page: ft.Page, conn, cur, paths):
     page.title = "Consultorio Gerontológico Integral - Dra. Zulma Cabrera"
     page.window_maximized = True
     page.theme_mode = "light"
+    page.bgcolor="#F4F1ED"
     
-    def close_banner(e=None):
-        page.banner.open = False
-        page.update()
-
-    page.banner = ft.Banner(
-        bgcolor=ft.Colors.AMBER_100,
-        leading=ft.Icon(ft.Icons.WARNING, color=ft.Colors.RED_400),
-        content=ft.Text(""),
-        actions=[
-            ft.TextButton("Cancelar", on_click=close_banner),
-            ft.ElevatedButton("Confirmar", on_click=close_banner),
-        ],
-    )
-
     # ---------- FORM (izquierda) ----------
     tf_nombre   = ft.TextField(label="Nombre",    expand=True)
     tf_dni      = ft.TextField(label="DNI",       expand=True)
@@ -95,20 +82,20 @@ def make_app(page: ft.Page, conn, cur, paths):
     # ---------- TABLA (derecha) ----------
     # Cabeceras
     table_columns = [
-        ft.DataColumn(ft.Text(HEADERS["id"])),
+        #ft.DataColumn(ft.Text(HEADERS["id"])),
         ft.DataColumn(ft.Text(HEADERS["nombre"])),
         ft.DataColumn(ft.Text(HEADERS["dni"])),
         ft.DataColumn(ft.Text(HEADERS["edad"])),
-        ft.DataColumn(ft.Text(HEADERS["domicilio"])),
+        #ft.DataColumn(ft.Text(HEADERS["domicilio"])),
         ft.DataColumn(ft.Text(HEADERS["obra_social"])),
         ft.DataColumn(ft.Text(HEADERS["numero_beneficio"])),
         ft.DataColumn(ft.Text(HEADERS["telefono"])),
-        ft.DataColumn(ft.Text(HEADERS["email"])),
-        ft.DataColumn(ft.Text(HEADERS["antecedentes_personales"])),
-        ft.DataColumn(ft.Text(HEADERS["antecedentes_familiares"])),
-        ft.DataColumn(ft.Text(HEADERS["examen_fisico"])),
-        ft.DataColumn(ft.Text(HEADERS["diagnostico_presuntivo"])),
-        ft.DataColumn(ft.Text(HEADERS["evolucion_seguimiento"])),
+        #ft.DataColumn(ft.Text(HEADERS["email"])),
+        #ft.DataColumn(ft.Text(HEADERS["antecedentes_personales"])),
+        #ft.DataColumn(ft.Text(HEADERS["antecedentes_familiares"])),
+        #ft.DataColumn(ft.Text(HEADERS["examen_fisico"])),
+        #ft.DataColumn(ft.Text(HEADERS["diagnostico_presuntivo"])),
+        #ft.DataColumn(ft.Text(HEADERS["evolucion_seguimiento"])),
         ft.DataColumn(ft.Text(HEADERS["motivo_consulta"])),
     ]
     
@@ -144,18 +131,21 @@ def make_app(page: ft.Page, conn, cur, paths):
     def table_set_rows(rows):
         table.rows = []
 
+        visible_indexes = [1, 2, 3, 5, 6, 7, 14 ]
+
         def on_cell_tap(e, values):
             # Cargar valores al formulario al tocar cualquier celda
             load_to_form(values)
 
+        
         for r in rows:
             # cada celda reacciona al click y carga el form
             cells = [
                 ft.DataCell(
-                    ft.Text(str(x or "")),
+                    ft.Text(str(r[i] or "")),
                     on_tap=lambda e, v=r: on_cell_tap(e, v)
                 )
-                for x in r
+                for i in visible_indexes
             ]
             table.rows.append(ft.DataRow(cells=cells))
 
@@ -187,12 +177,35 @@ def make_app(page: ft.Page, conn, cur, paths):
             cur.execute("SELECT * FROM historias")
         table_set_rows(cur.fetchall())
 
+
+    def refrescarTabla():
+        rows = []
+
+        visible_indexes = [1, 2, 3, 5, 6, 7, 14 ]
+
+        def on_cell_tap(e, values):
+            # Cargar valores al formulario al tocar cualquier celda
+            load_to_form(values)
+
+        
+        for r in rows:
+            # cada celda reacciona al click y carga el form
+            cells = [
+                ft.DataCell(
+                    ft.Text(str(r[i] or "")),
+                    on_tap=lambda e, v=r: on_cell_tap(e, v)
+                )
+                for i in visible_indexes
+            ]
+            rows.append(ft.DataRow(cells=cells))
+
+        page.update()
+        
+       # cur.execute("SELECT * FROM historias")
+        #table_set_rows(cur.fetchall())
+    
     # Atajo Enter en el buscador
     q_field.on_submit = apply_filter
-
-    # ---------- Acciones (CRUD / PDF / CSV / Backup) ----------
-    
-
 
 #----------
     # CSV con FilePicker
@@ -220,7 +233,7 @@ def make_app(page: ft.Page, conn, cur, paths):
             tf_nombre, tf_dni, tf_edad, tf_dom, tf_obra, tf_benef, tf_tel, tf_email, tf_motivo,
             ta_ant_pers, ta_ant_fam, ta_examen, ta_diag, ta_evol,
             ft.Row([
-                ft.ElevatedButton("Guardar",on_click=lambda e: guardar(cur, conn, get_form_data, clear_form, after_refresh, page), expand=1),
+                ft.ElevatedButton("Guardar",bgcolor="#B0E0A8",on_click=lambda e: guardar(cur, conn, get_form_data, clear_form, after_refresh, page), expand=1),
                 ft.ElevatedButton("Actualizar",on_click=lambda e: actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_refresh, page), expand=1),
             ], spacing=10),
             ft.Row([
@@ -239,13 +252,18 @@ def make_app(page: ft.Page, conn, cur, paths):
         spacing=8,
         scroll=ft.ScrollMode.AUTO,
     )
-
+    
+        
+        
     #ft.IconButton(ft.icons.SEARCH, tooltip="Buscar", on_click=apply_filter) Icons no funciona
     
     # Columna derecha (search + tabla) con scroll horizontal y vertical
     right_panel = ft.Column(
         controls=[
-            ft.Row([q_field, crit_dd, ft.FilledButton("Buscar", on_click=apply_filter)], spacing=8),
+            ft.Row([q_field, crit_dd,
+                    ft.FilledButton("Buscar", on_click=apply_filter),
+                    ft.FilledButton("Actualizar", on_click = lambda e: refresh_table()),
+                    ],spacing=10),
             ft.Container(
                 content=ft.ListView(
                     controls=[table],
@@ -254,6 +272,7 @@ def make_app(page: ft.Page, conn, cur, paths):
                 expand=True,
             )
         ],
+        
         expand=True,
         spacing=8,
     )
@@ -261,8 +280,10 @@ def make_app(page: ft.Page, conn, cur, paths):
     page.add(
         ft.ResponsiveRow(
             controls=[
-                ft.Container(left_form, col={"xs":12, "md":5, "lg":4}),
-                ft.Container(right_panel, col={"xs":12, "md":7, "lg":8}),
+                ft.Container(left_form, col={"xs":12, "md":5, "lg":4},
+                             bgcolor="#F4F1ED"),
+                ft.Container(right_panel, col={"xs":12, "md":7, "lg":8},
+                             bgcolor="#F4F1ED"),
             ],
             expand=True
         )

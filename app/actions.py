@@ -126,7 +126,7 @@ def generar_pdf_action(paths, selected_row_values, page: ft.Page):
         _warn(page, "Atención", "Seleccioná una historia para generar PDF"); return
     try:
         out = generar_pdf(paths, values)
-        _notify(page, f"PDF guardado en:\n{out}")
+        _notify(f"PDF guardado en:\n{out}", page)
     except Exception as ex:
         _err(page, "Error PDF", str(ex))
 

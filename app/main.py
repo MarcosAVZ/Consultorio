@@ -6,6 +6,9 @@ import flet as ft
 import actions as ACT
 import ui
 
+import tkinter as tk
+from tkinter import ttk, scrolledtext
+
 from ui import make_app
 from functools import partial
 #from actions import *
@@ -26,6 +29,6 @@ def app_main(page: ft.Page):
     make_app(page, conn, cur, paths)
 
 
+
 if __name__ == "__main__":
     ft.app(target=app_main)
-

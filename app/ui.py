@@ -1,13 +1,19 @@
 # ui.py
-import tkinter as tk
-from tkinter import ttk, scrolledtext
+import csv
+import datetime as dt
+import flet as ft
+#import actions as ACT
 
+from backup_drive import can_backup,backup_now
+from actions import *
+
+
+# --- Constantes y columnas de la BD (mismo orden que en db.py/ui.py) ---
 COLUMNS = (
     "id","nombre","dni","edad","domicilio","obra_social","numero_beneficio",
     "telefono","email","antecedentes_personales","antecedentes_familiares",
     "examen_fisico","diagnostico_presuntivo","evolucion_seguimiento","motivo_consulta"
 )
-
 HEADERS = {
     "id":"ID","nombre":"Nombre","dni":"DNI","edad":"Edad","domicilio":"Domicilio",
     "obra_social":"Obra Social","numero_beneficio":"N° Beneficio","telefono":"Teléfono","email":"Email",
@@ -15,129 +21,281 @@ HEADERS = {
     "examen_fisico":"Examen Físico","diagnostico_presuntivo":"Diagnóstico Presuntivo",
     "evolucion_seguimiento":"Evolución/Seguimiento","motivo_consulta":"Motivo Consulta"
 }
-WIDTHS = {
-    "id":60,"nombre":160,"dni":110,"edad":60,"domicilio":180,"obra_social":120,"numero_beneficio":120,
-    "telefono":110,"email":160,"antecedentes_personales":220,"antecedentes_familiares":220,
-    "examen_fisico":220,"diagnostico_presuntivo":220,"evolucion_seguimiento":240,"motivo_consulta":200
-}
 
-def build_form(parent):
-    frame = ttk.Frame(parent, padding=10); frame.pack(side=tk.LEFT, fill=tk.Y)
 
-    def fila_entry(row, label, width=30):
-        ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0,6), pady=3)
-        e = ttk.Entry(frame, width=width); e.grid(row=row, column=1, sticky="ew", pady=3); return e
+def make_app(page: ft.Page, conn, cur, paths):
+    # ---------- Setup ----------
 
-    def fila_text(row, label, height=4, width=40):
-        ttk.Label(frame, text=label).grid(row=row, column=0, sticky="nw", padx=(0,6), pady=(8,3))
-        t = scrolledtext.ScrolledText(frame, width=width, height=height, wrap=tk.WORD)
-        t.grid(row=row, column=1, sticky="ew", pady=(8,3)); return t
+    print("[DEBUG] can_backup:", can_backup(paths))
+    
+    page.title = "Consultorio Gerontológico Integral - Dra. Zulma Cabrera"
+    page.window_maximized = True
+    page.theme_mode = "light"
+    page.bgcolor="#F4F1ED"
+    
+    # ---------- FORM (izquierda) ----------
+    tf_nombre   = ft.TextField(label="Nombre",    expand=True)
+    tf_dni      = ft.TextField(label="DNI",       expand=True)
+    tf_edad     = ft.TextField(label="Edad",      expand=True)
+    tf_dom      = ft.TextField(label="Domicilio", expand=True)
+    tf_obra     = ft.TextField(label="Obra social", expand=True)
+    tf_benef    = ft.TextField(label="N° beneficio", expand=True)
+    tf_tel      = ft.TextField(label="Teléfono",  expand=True)
+    tf_email    = ft.TextField(label="Email",     expand=True)
+    tf_motivo   = ft.TextField(label="Motivo de consulta", expand=True)
 
-    fields = {
-        "nombre": fila_entry(0, "Nombre"),
-        "dni": fila_entry(1, "DNI"),
-        "edad": fila_entry(2, "Edad"),
-        "domicilio": fila_entry(3, "Domicilio"),
-        "obra_social": fila_entry(4, "Obra social"),
-        "numero_beneficio": fila_entry(5, "N° beneficio"),
-        "telefono": fila_entry(6, "Teléfono"),
-        "email": fila_entry(7, "Email"),
-        "motivo_consulta": fila_entry(8, "Motivo de consulta"),
-        "antecedentes_personales": fila_text(9, "Antecedentes personales"),
-        "antecedentes_familiares": fila_text(10, "Antecedentes familiares"),
-        "examen_fisico": fila_text(11, "Examen físico"),
-        "diagnostico_presuntivo": fila_text(12, "Diagnóstico presuntivo"),
-        "evolucion_seguimiento": fila_text(13, "Evolución / seguimiento"),
-    }
-    frame.columnconfigure(1, weight=1)
-    return frame, fields
+    ta_ant_pers = ft.TextField(label="Antecedentes personales", multiline=True, min_lines=3, max_lines=5)
+    ta_ant_fam  = ft.TextField(label="Antecedentes familiares", multiline=True, min_lines=3, max_lines=5)
+    ta_examen   = ft.TextField(label="Examen físico",           multiline=True, min_lines=3, max_lines=5)
+    ta_diag     = ft.TextField(label="Diagnóstico presuntivo",  multiline=True, min_lines=3, max_lines=5)
+    ta_evol     = ft.TextField(label="Evolución / seguimiento", multiline=True, min_lines=3, max_lines=5)
 
-def get_form_data(fields):
-    data = {k: fields[k].get().strip() for k in
-            ["nombre","dni","edad","domicilio","obra_social","numero_beneficio","telefono","email","motivo_consulta"]}
-    data["antecedentes_personales"] = fields["antecedentes_personales"].get("1.0", tk.END).strip()
-    data["antecedentes_familiares"] = fields["antecedentes_familiares"].get("1.0", tk.END).strip()
-    data["examen_fisico"] = fields["examen_fisico"].get("1.0", tk.END).strip()
-    data["diagnostico_presuntivo"] = fields["diagnostico_presuntivo"].get("1.0", tk.END).strip()
-    data["evolucion_seguimiento"] = fields["evolucion_seguimiento"].get("1.0", tk.END).strip()
-    return data
+    # Para saber qué fila está seleccionada actualmente
+    selected_row_values = {"values": None}  # dict mutable para cerrar sobre él
 
-def clear_form(fields):
-    for w in fields.values():
-        if isinstance(w, (tk.Text, scrolledtext.ScrolledText)):
-            w.delete("1.0", tk.END)
+    def clear_form():
+        for w in [tf_nombre, tf_dni, tf_edad, tf_dom, tf_obra, tf_benef, tf_tel, tf_email, tf_motivo,
+                  ta_ant_pers, ta_ant_fam, ta_examen, ta_diag, ta_evol]:
+            w.value = ""
+        selected_row_values["values"] = None
+        page.update()
+
+    def get_form_data():
+        data = {
+            "nombre": tf_nombre.value.strip(),
+            "dni": tf_dni.value.strip(),
+            "edad": tf_edad.value.strip(),
+            "domicilio": tf_dom.value.strip(),
+            "obra_social": tf_obra.value.strip(),
+            "numero_beneficio": tf_benef.value.strip(),
+            "telefono": tf_tel.value.strip(),
+            "email": tf_email.value.strip(),
+            "motivo_consulta": tf_motivo.value.strip(),
+            "antecedentes_personales": ta_ant_pers.value.strip(),
+            "antecedentes_familiares": ta_ant_fam.value.strip(),
+            "examen_fisico": ta_examen.value.strip(),
+            "diagnostico_presuntivo": ta_diag.value.strip(),
+            "evolucion_seguimiento": ta_evol.value.strip(),
+        }
+        return data
+
+    # ---------- TABLA (derecha) ----------
+    # Cabeceras
+    table_columns = [
+        #ft.DataColumn(ft.Text(HEADERS["id"])),
+        ft.DataColumn(ft.Text(HEADERS["nombre"])),
+        ft.DataColumn(ft.Text(HEADERS["dni"])),
+        ft.DataColumn(ft.Text(HEADERS["edad"])),
+        #ft.DataColumn(ft.Text(HEADERS["domicilio"])),
+        ft.DataColumn(ft.Text(HEADERS["obra_social"])),
+        ft.DataColumn(ft.Text(HEADERS["numero_beneficio"])),
+        ft.DataColumn(ft.Text(HEADERS["telefono"])),
+        #ft.DataColumn(ft.Text(HEADERS["email"])),
+        #ft.DataColumn(ft.Text(HEADERS["antecedentes_personales"])),
+        #ft.DataColumn(ft.Text(HEADERS["antecedentes_familiares"])),
+        #ft.DataColumn(ft.Text(HEADERS["examen_fisico"])),
+        #ft.DataColumn(ft.Text(HEADERS["diagnostico_presuntivo"])),
+        #ft.DataColumn(ft.Text(HEADERS["evolucion_seguimiento"])),
+        ft.DataColumn(ft.Text(HEADERS["motivo_consulta"])),
+    ]
+    
+    def load_to_form(values):
+        tf_nombre.value = values[1] or ""
+        tf_dni.value    = values[2] or ""
+        tf_edad.value   = str(values[3] or "")
+        tf_dom.value    = values[4] or ""
+        tf_obra.value   = values[5] or ""
+        tf_benef.value  = values[6] or ""
+        tf_tel.value    = values[7] or ""
+        tf_email.value  = values[8] or ""
+        ta_ant_pers.value = values[9] or ""
+        ta_ant_fam.value  = values[10] or ""
+        ta_examen.value   = values[11] or ""
+        ta_diag.value     = values[12] or ""
+        ta_evol.value     = values[13] or ""
+        tf_motivo.value   = values[14] or ""
+        selected_row_values["values"] = values
+        page.update()
+
+    
+    #table = ft.DataTable(columns=table_columns, rows=[], heading_row_height=36, data_row_max_height=64)-----
+    
+    table = ft.DataTable(
+    columns=table_columns,
+    rows=[],
+    heading_row_height=36,
+    data_row_max_height=64,
+    show_checkbox_column=False,
+    )
+
+    def table_set_rows(rows):
+        table.rows = []
+
+        visible_indexes = [1, 2, 3, 5, 6, 7, 14 ]
+
+        def on_cell_tap(e, values):
+            # Cargar valores al formulario al tocar cualquier celda
+            load_to_form(values)
+
+        
+        for r in rows:
+            # cada celda reacciona al click y carga el form
+            cells = [
+                ft.DataCell(
+                    ft.Text(str(r[i] or "")),
+                    on_tap=lambda e, v=r: on_cell_tap(e, v)
+                )
+                for i in visible_indexes
+            ]
+            table.rows.append(ft.DataRow(cells=cells))
+
+        page.update()
+
+
+    def refresh_table():
+        cur.execute("SELECT * FROM historias")
+        table_set_rows(cur.fetchall())
+        
+    def after_refresh():
+        cur.execute("SELECT * FROM historias")
+        table_set_rows(cur.fetchall())
+
+    # ---------- BÚSQUEDA ----------
+    q_field = ft.TextField(label="Buscar", width=260)
+    crit_dd = ft.Dropdown(
+        label="criterio",
+        value="nombre",
+        options=[ft.dropdown.Option("nombre"), ft.dropdown.Option("dni")],
+        width=140
+    )
+    def apply_filter(_=None):
+        q = (q_field.value or "").strip()
+        crit = crit_dd.value or "nombre"
+        if q:
+            cur.execute(f"SELECT * FROM historias WHERE {crit} LIKE ?", (f"%{q}%",))
         else:
-            w.delete(0, tk.END)
+            cur.execute("SELECT * FROM historias")
+        table_set_rows(cur.fetchall())
 
-def build_actions(parent, handlers):
-    actions = ttk.Frame(parent, padding=(0,10,0,0))
-    actions.grid(row=14, column=0, columnspan=2, sticky="ew")
-    actions.columnconfigure(0, weight=1); actions.columnconfigure(1, weight=1)
 
-    ttk.Button(actions, text="Guardar",     command=handlers["guardar"]).grid(   row=0, column=0, sticky="ew", padx=(0,6), pady=4)
-    ttk.Button(actions, text="Actualizar",  command=handlers["actualizar"]).grid(row=0, column=1, sticky="ew", padx=(6,0), pady=4)
-    ttk.Button(actions, text="Borrar",      command=handlers["borrar"]).grid(    row=1, column=0, sticky="ew", padx=(0,6), pady=4)
-    ttk.Button(actions, text="Generar PDF", command=handlers["pdf"]).grid(       row=1, column=1, sticky="ew", padx=(6,0), pady=4)
-    ttk.Button(actions, text="Limpiar",     command=handlers["limpiar"]).grid(   row=2, column=0, columnspan=2, sticky="ew", pady=(6,0))
-    ttk.Button(actions, text="Exportar CSV",command=handlers["csv"]).grid(       row=3, column=0, sticky="ew", padx=(0,6), pady=4)
-    btn_bkp = ttk.Button(actions, text="Backup ahora", command=handlers["backup"])
-    btn_bkp.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(6,0))
-    return btn_bkp
+    def refrescarTabla():
+        rows = []
 
-def build_table(root):
-    right = ttk.Frame(root, padding=10); right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        visible_indexes = [1, 2, 3, 5, 6, 7, 14 ]
 
-    # buscador
-    search_bar = ttk.Frame(right); search_bar.pack(side=tk.TOP, fill=tk.X, pady=(0,8))
-    tk.Label(search_bar, text="Buscar:").pack(side=tk.LEFT, padx=(0,6))
-    q_var = tk.StringVar(); ent = ttk.Entry(search_bar, textvariable=q_var, width=30); ent.pack(side=tk.LEFT)
-    crit_var = tk.StringVar(value="nombre")
-    ttk.Combobox(search_bar, textvariable=crit_var, width=12, state="readonly", values=["nombre","dni"]).pack(side=tk.LEFT, padx=6)
+        def on_cell_tap(e, values):
+            # Cargar valores al formulario al tocar cualquier celda
+            load_to_form(values)
 
-    # tabla + scrolls
-    yb = ttk.Scrollbar(right, orient="vertical")
-    xb = ttk.Scrollbar(right, orient="horizontal")
-    table = ttk.Treeview(right, columns=COLUMNS, show="headings", yscrollcommand=yb.set, xscrollcommand=xb.set, selectmode="browse")
-    yb.config(command=table.yview); xb.config(command=table.xview)
-    table.pack(side=tk.TOP, fill=tk.BOTH, expand=True); yb.pack(side=tk.RIGHT, fill=tk.Y); xb.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        for r in rows:
+            # cada celda reacciona al click y carga el form
+            cells = [
+                ft.DataCell(
+                    ft.Text(str(r[i] or "")),
+                    on_tap=lambda e, v=r: on_cell_tap(e, v)
+                )
+                for i in visible_indexes
+            ]
+            rows.append(ft.DataRow(cells=cells))
 
-    for c in COLUMNS:
-        table.heading(c, text=HEADERS[c])
-        table.column(c, width=WIDTHS.get(c,120), anchor="w", stretch=True)
+        page.update()
+        
+       # cur.execute("SELECT * FROM historias")
+        #table_set_rows(cur.fetchall())
+    
+    # Atajo Enter en el buscador
+    q_field.on_submit = apply_filter
 
-    return right, table, q_var, crit_var
+#----------
+    # CSV con FilePicker
+    fp = ft.FilePicker()
+    page.overlay.append(fp)
 
-def cargar_desde_tabla(table, fields):
-    sel = table.focus()
-    if not sel: return
-    data = table.item(sel,'values')
-    # entries
-    fields["nombre"].delete(0, tk.END); fields["nombre"].insert(0, data[1])
-    fields["dni"].delete(0, tk.END); fields["dni"].insert(0, data[2])
-    fields["edad"].delete(0, tk.END); fields["edad"].insert(0, data[3])
-    fields["domicilio"].delete(0, tk.END); fields["domicilio"].insert(0, data[4])
-    fields["obra_social"].delete(0, tk.END); fields["obra_social"].insert(0, data[5])
-    fields["numero_beneficio"].delete(0, tk.END); fields["numero_beneficio"].insert(0, data[6])
-    fields["telefono"].delete(0, tk.END); fields["telefono"].insert(0, data[7])
-    fields["email"].delete(0, tk.END); fields["email"].insert(0, data[8])
-    fields["motivo_consulta"].delete(0, tk.END); fields["motivo_consulta"].insert(0, data[14] or "")
-    # texts
-    fields["antecedentes_personales"].delete("1.0", tk.END); fields["antecedentes_personales"].insert(tk.END, data[9] or "")
-    fields["antecedentes_familiares"].delete("1.0", tk.END); fields["antecedentes_familiares"].insert(tk.END, data[10] or "")
-    fields["examen_fisico"].delete("1.0", tk.END); fields["examen_fisico"].insert(tk.END, data[11] or "")
-    fields["diagnostico_presuntivo"].delete("1.0", tk.END); fields["diagnostico_presuntivo"].insert(tk.END, data[12] or "")
-    fields["evolucion_seguimiento"].delete("1.0", tk.END); fields["evolucion_seguimiento"].insert(tk.END, data[13] or "")
+    def export_csv_action(_=None):
+        cur.execute("SELECT * FROM historias"); rows = cur.fetchall()
+        headers = [d[0] for d in cur.description]
+        # sugerir nombre
+        suggested = f"historias_{dt.datetime.now():%Y%m%d_%H%M%S}.csv"
+        def save_result(e: ft.FilePickerResultEvent):
+            if not e.path: return
+            with open(e.path, "w", encoding="utf-8-sig", newline="") as f:
+                w = csv.writer(f, delimiter=";")
+                w.writerow(headers); w.writerows(rows)
+            page.snack_bar = ft.SnackBar(ft.Text(f"Se exportaron {len(rows)} filas a:\n{e.path}"), open=True); page.update()
+        fp.on_save = save_result
+        fp.save_file(file_name=suggested, allowed_extensions=["csv"])
 
-def bind_context_menu(root, widgets):
-    menu = tk.Menu(root, tearoff=0)
-    def show_menu(e):
-        w = e.widget; menu.delete(0,"end")
-        if isinstance(w, (tk.Entry, ttk.Entry)):
-            menu.add_command(label="Copiar", command=lambda: root.clipboard_clear() or root.clipboard_append(w.get()))
-            menu.add_command(label="Pegar",  command=lambda: w.delete(0, tk.END) or w.insert(0, root.clipboard_get()))
-            menu.tk_popup(e.x_root, e.y_root)
-        elif isinstance(w, (tk.Text, scrolledtext.ScrolledText)):
-            menu.add_command(label="Copiar", command=lambda: root.clipboard_clear() or root.clipboard_append(w.get("1.0", tk.END)))
-            menu.add_command(label="Pegar",  command=lambda: w.delete("1.0", tk.END) or w.insert(tk.END, root.clipboard_get()))
-            menu.tk_popup(e.x_root, e.y_root)
-    for w in widgets: w.bind("<Button-3>", show_menu)
+    # ---------- Layout ----------
+    # Columna izquierda (form) con scroll
+    left_form = ft.Column(
+        controls=[
+            tf_nombre, tf_dni, tf_edad, tf_dom, tf_obra, tf_benef, tf_tel, tf_email, tf_motivo,
+            ta_ant_pers, ta_ant_fam, ta_examen, ta_diag, ta_evol,
+            ft.Row([
+                ft.ElevatedButton("Guardar",bgcolor="#B0E0A8",on_click=lambda e: guardar(cur, conn, get_form_data, clear_form, after_refresh, page), expand=1),
+                ft.ElevatedButton("Actualizar",on_click=lambda e: actualizar(cur, conn, selected_row_values, get_form_data, clear_form, after_refresh, page), expand=1),
+            ], spacing=10),
+            ft.Row([
+                ft.ElevatedButton("Borrar",on_click=lambda e: accionBorrar(page, selected_row_values, cur, conn, clear_form, after_refresh), expand=1),
+                ft.ElevatedButton("Generar PDF",on_click=lambda e: generar_pdf_action(paths, selected_row_values, page), expand=1),
+            ], spacing=10),
+            ft.Row([
+                ft.ElevatedButton("Limpiar", on_click=lambda e: clear_form(), expand=1),
+                ft.ElevatedButton("Exportar CSV",on_click=lambda e: export_csv(cur, page, fp), expand=1),
+            ], spacing=10),
+            
+            ft.ElevatedButton("Backup ahora",on_click=lambda e: backup_now_action(paths, page),disabled=not can_backup(paths)),
+        ],
+        
+        expand=True,
+        spacing=8,
+        scroll=ft.ScrollMode.AUTO,
+    )
+    
+        
+        
+    #ft.IconButton(ft.icons.SEARCH, tooltip="Buscar", on_click=apply_filter) Icons no funciona
+    
+    # Columna derecha (search + tabla) con scroll horizontal y vertical
+    right_panel = ft.Column(
+        controls=[
+            ft.Row([q_field, crit_dd,
+                    ft.FilledButton("Buscar", on_click=apply_filter),
+                    ft.FilledButton("Actualizar", on_click = lambda e: refresh_table()),
+                    ],spacing=10),
+            ft.Container(
+                content=ft.ListView(
+                    controls=[table],
+                    expand=True,
+                ),
+                expand=True,
+            )
+        ],
+        
+        expand=True,
+        spacing=8,
+    )
+
+    page.add(
+        ft.ResponsiveRow(
+            controls=[
+                ft.Container(left_form, col={"xs":12, "md":5, "lg":4},
+                             bgcolor="#F4F1ED"),
+                ft.Container(right_panel, col={"xs":12, "md":7, "lg":8},
+                             bgcolor="#F4F1ED"),
+            ],
+            expand=True
+        )
+    )
+
+    # Datos iniciales
+    refresh_table()
+
+    # Cerrar conexión al salir
+    def on_close(e):
+        try:
+            conn.commit(); conn.close()
+        except: pass
+        page.window_destroy()
+    page.on_close = on_close

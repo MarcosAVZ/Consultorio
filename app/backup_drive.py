@@ -10,60 +10,69 @@ except Exception:
 
 # PyDrive2 importada + client_secrets.json existe en la ruta que define paths.py
 def can_backup(paths: dict) -> bool:
-    
+    print("[DEBUG] revisando si puede hacer backup")
     return PYDRIVE_AVAILABLE and os.path.exists(paths["CLIENT_SECRETS"])
 
 def backup_now(paths: dict):
     if not can_backup(paths):
+        print("[DEBUG] client_secrets:", paths.get("CLIENT_SECRETS"))
+        print("[DEBUG] token_file:", paths.get("TOKEN_FILE"))
+        print("[DEBUG] base_dir:", paths.get("BASE_DIR"))
         raise RuntimeError("No está disponible PyDrive2 o falta client_secrets.json")
+    gauth = GoogleAuth()
+    # configuración: offline + consent
+    gauth.settings['get_refresh_token'] = True
+    gauth.settings['oauth_scope'] = ['https://www.googleapis.com/auth/drive']
+    gauth.settings['client_config_file'] = paths["CLIENT_SECRETS"]
 
-    # Configurar GoogleAuth con backend 'file' y rutas explícitas
-    gauth = GoogleAuth(settings={
-        "client_config_backend": "file",
-        "client_config_file": paths["CLIENT_SECRETS"],   # ruta absoluta al JSON
-        "save_credentials": True,
-        "save_credentials_backend": "file",
-        "save_credentials_file": paths["TOKEN_FILE"],     # ruta absoluta al token
-        # Pedimos alcance acotado: solo archivos creados por la app
-        "oauth_scope": ["https://www.googleapis.com/auth/drive.file"],
-        # Forzar refresh_token
-        "oauth_request_params": {"access_type": "offline", "prompt": "consent"},
-        # Si 8080 está ocupado, PyDrive2 probará también 8090
-        "auth_host_port": [8080, 8090],
-        "auth_local_webserver": True,
-    })
+    token_file = paths["TOKEN_FILE"]
 
-    # Cargar credenciales previas si existen
-    gauth.LoadCredentialsFile(paths["TOKEN_FILE"])
-    
-    if gauth.credentials is None:
-        # Primera vez: abre el navegador
+    # cargar si existe
+    if os.path.exists(token_file):
+        gauth.LoadCredentialsFile(token_file)
+
+    try:
+        if gauth.credentials is None:
+            print("[DEBUG] No hay credenciales, iniciando autorizar de nuevo")
+            gauth.GetFlow()
+            gauth.flow.params.update({'access_type': 'offline', 'prompt': 'consent'})
+            gauth.LocalWebserverAuth()
+        elif gauth.access_token_expired:
+            print("[DEBUG] Token expirado, refrescando")
+            gauth.Refresh()
+        else:
+            print("[DEBUG] Credenciales válidas, autorizando")
+            gauth.Authorize()
+
+        # Guardar credenciales nuevas
+        gauth.SaveCredentialsFile(token_file)
+        print("[DEBUG] Credenciales guardadas en:", token_file)
+
+    except Exception as ex:
+        print("[DEBUG] Falló autenticación/re-autorización:", ex)
+        # eliminar token viejo si existe
+        if os.path.exists(token_file):
+            os.remove(token_file)
+            print("[DEBUG] Archivo token eliminado:", token_file)
+        # intentar de nuevo autorización completa
         gauth.LocalWebserverAuth()
-    elif gauth.access_token_expired:
-        # Refresca usando refresh_token del token guardado
-        gauth.Refresh()
-    else:
-        gauth.Authorize()
-
-    # Guardar/actualizar token
-    gauth.SaveCredentialsFile(paths["TOKEN_FILE"])
+        gauth.SaveCredentialsFile(token_file)
+        print("[DEBUG] Re-autorización completada, credenciales guardadas")
 
     # Verificación opcional: asegurar que tenemos refresh_token
     if not getattr(gauth.credentials, "refresh_token", None):
         raise RuntimeError("No refresh_token disponible. Revoque el acceso y autorice nuevamente con 'offline'.")
 
     drive = GoogleDrive(gauth)
+    
 
-    # Crear ZIP de la BD
+# Lógica zip (igual que antes)
     zip_name = f"Backup_{datetime.datetime.now():%Y%m%d_%H%M%S}.zip"
     zip_path = os.path.join(paths["BASE_DIR"], zip_name)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(paths["DB_NAME"], arcname=os.path.basename(paths["DB_NAME"]))
-
-    
-    q = "title='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false".format(
-        name=paths["DRIVE_FOLDER_NAME"]
-    )
+        
+    q = f"title='{paths['DRIVE_FOLDER_NAME']}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     flist = drive.ListFile({'q': q}).GetList()
     if flist:
         folder_id = flist[0]['id']
@@ -75,23 +84,22 @@ def backup_now(paths: dict):
         folder.Upload()
         folder_id = folder['id']
 
-    # Subir el ZIP
-    f = drive.CreateFile({'title': zip_name, 'parents': [{'id': folder_id}]})
-    try:
-        f.SetContentFile(zip_path)
-        f.Upload()
-    finally:
-        
-        try:
-            if hasattr(f, "content") and hasattr(f.content, "close"):
-                f.content.close()  
-        except Exception:
-            pass
 
-    # Borrar ZIP local
-    for _ in range(5):
-        try:
-            os.remove(zip_path)
-            break
-        except PermissionError:
-            time.sleep(0.5)
+    # Subida al Drive
+    f = drive.CreateFile({'title': zip_name, 'parents':[{'id': folder_id}]})
+    f.SetContentFile(zip_path)
+    f.Upload()
+    print("[DEBUG] Archivo subido a Drive:", zip_path)
+
+    # Asegurar que todos los handles de archivo están cerrados → liberamos manualmente
+    try:
+        del f  # eliminar referencia
+    except NameError:
+        pass
+
+    # Intentar eliminar el zip local
+    try:
+        os.remove(zip_path)
+        print("[DEBUG] Archivo zip local eliminado:", zip_path)
+    except Exception as ex:
+        print("[DEBUG] Error al borrar localmente el zip:", zip_path, ex)

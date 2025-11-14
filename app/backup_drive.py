@@ -1,5 +1,5 @@
 # backup_drive.py
-import os, zipfile, datetime
+import os, zipfile, datetime, time
 
 try:
     from pydrive2.auth import GoogleAuth
@@ -8,6 +8,7 @@ try:
 except Exception:
     PYDRIVE_AVAILABLE = False
 
+# PyDrive2 importada + client_secrets.json existe en la ruta que define paths.py
 def can_backup(paths: dict) -> bool:
     print("[DEBUG] revisando si puede hacer backup")
     return PYDRIVE_AVAILABLE and os.path.exists(paths["CLIENT_SECRETS"])
@@ -58,13 +59,16 @@ def backup_now(paths: dict):
         gauth.SaveCredentialsFile(token_file)
         print("[DEBUG] Re-autorización completada, credenciales guardadas")
 
+    # Verificación opcional: asegurar que tenemos refresh_token
+    if not getattr(gauth.credentials, "refresh_token", None):
+        raise RuntimeError("No refresh_token disponible. Revoque el acceso y autorice nuevamente con 'offline'.")
+
     drive = GoogleDrive(gauth)
     
 
 # Lógica zip (igual que antes)
     zip_name = f"Backup_{datetime.datetime.now():%Y%m%d_%H%M%S}.zip"
     zip_path = os.path.join(paths["BASE_DIR"], zip_name)
-
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(paths["DB_NAME"], arcname=os.path.basename(paths["DB_NAME"]))
         
@@ -73,7 +77,10 @@ def backup_now(paths: dict):
     if flist:
         folder_id = flist[0]['id']
     else:
-        folder = drive.CreateFile({'title': paths['DRIVE_FOLDER_NAME'], 'mimeType': 'application/vnd.google-apps.folder'})
+        folder = drive.CreateFile({
+            'title': paths['DRIVE_FOLDER_NAME'],
+            'mimeType': 'application/vnd.google-apps.folder'
+        })
         folder.Upload()
         folder_id = folder['id']
 

@@ -1,5 +1,5 @@
 # paths.py
-import os, sys
+import os, sys, json
 
 APP_NAME    = "Consultorio"
 DB_FILENAME = "historias_clinicas_v5.db"
@@ -44,9 +44,10 @@ def get_paths():
     os.makedirs(pdfs_dir, exist_ok=True)
     os.makedirs(images_dir, exist_ok=True)
 
-    # 5) Migración: mover BD si quedó en ubicaciones antiguas
-    #    - data/historias_clinicas_v5.db  (raíz de data)
-    #    - carpeta junto al ejecutable o junto a este archivo
+    cfg = load_config(base_dir)
+    if isinstance(cfg.get("pdfs_dir"), str) and cfg["pdfs_dir"].strip():
+        pdfs_dir = cfg["pdfs_dir"].strip()
+        os.makedirs(pdfs_dir, exist_ok=True)
     legacy_candidates = []
 
     # raíz de data (versión previa)
@@ -75,3 +76,35 @@ def get_paths():
         "TOKEN_FILE": token_file,
         "DRIVE_FOLDER_NAME": "Backups Consultorio Dra. Zulma Cabrera",
     }
+
+
+def _config_file(base_dir: str) -> str:
+    return os.path.join(base_dir, "config.json")
+
+def load_config(base_dir: str) -> dict:
+    cfg_path = _config_file(base_dir)
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_config(base_dir: str, config: dict) -> None:
+    cfg_path = _config_file(base_dir)
+    os.makedirs(base_dir, exist_ok=True)
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+def set_pdfs_dir(paths: dict, new_dir: str) -> dict:
+    new_dir = os.path.abspath(new_dir)
+    os.makedirs(new_dir, exist_ok=True)
+    # carga y guarda config
+    cfg = load_config(paths["BASE_DIR"])
+    cfg["pdfs_dir"] = new_dir
+    save_config(paths["BASE_DIR"], cfg)
+    # devuelve un dict paths actualizado
+    updated = dict(paths)
+    updated["PDFS_DIR"] = new_dir
+    return updated

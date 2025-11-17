@@ -35,7 +35,8 @@ def backup_now(paths: dict):
         if gauth.credentials is None:
             print("[DEBUG] No hay credenciales, iniciando autorizar de nuevo")
             gauth.GetFlow()
-            gauth.flow.params.update({'access_type': 'offline', 'prompt': 'consent'})
+            gauth.flow.params.update({'access_type': 'offline'})
+            gauth.flow.params.pop('approval_prompt', None)
             gauth.LocalWebserverAuth()
         elif gauth.access_token_expired:
             print("[DEBUG] Token expirado, refrescando")

@@ -1,5 +1,7 @@
 # backup_drive.py
 import os, zipfile, datetime, time
+from paths import load_config, save_config
+
 
 try:
     from pydrive2.auth import GoogleAuth
@@ -7,6 +9,13 @@ try:
     PYDRIVE_AVAILABLE = True
 except Exception:
     PYDRIVE_AVAILABLE = False
+
+def _marcar_ultimo_backup(paths: dict):
+    base_dir = paths["BASE_DIR"]
+    cfg = load_config(base_dir)
+    cfg["last_backup"] = datetime.date.today().isoformat()
+    save_config(base_dir, cfg)
+    print("[DEBUG] Último backup registrado en config.json")
 
 # PyDrive2 importada + client_secrets.json existe en la ruta que define paths.py
 def can_backup(paths: dict) -> bool:
@@ -91,7 +100,7 @@ def backup_now(paths: dict):
     f.SetContentFile(zip_path)
     f.Upload()
     print("[DEBUG] Archivo subido a Drive:", zip_path)
-
+    _marcar_ultimo_backup(paths)
     # Asegurar que todos los handles de archivo están cerrados → liberamos manualmente
     try:
         del f  # eliminar referencia
@@ -104,3 +113,41 @@ def backup_now(paths: dict):
         print("[DEBUG] Archivo zip local eliminado:", zip_path)
     except Exception as ex:
         print("[DEBUG] Error al borrar localmente el zip:", zip_path, ex)
+        
+
+def maybe_auto_backup(paths: dict, dias: int = 7):
+    
+    #
+    
+    if not can_backup(paths):
+        print("[DEBUG] No se puede hacer backup (falta PyDrive o client_secrets.json)")
+        return
+
+    today = datetime.date.today()
+    base_dir = paths["BASE_DIR"]
+    cfg = load_config(base_dir)
+
+    last_str = cfg.get("last_backup")
+
+    if not last_str:
+        # Nunca se hizo backup → hacemos el primero ahora
+        print("[DEBUG] No hay registro de backup previo, ejecutando primero backup...")
+        backup_now(paths)
+        return
+
+    try:
+        last_date = datetime.date.fromisoformat(last_str)
+    except Exception:
+        # Si el dato está corrupto, forzamos backup
+        print("[DEBUG] Fecha de último backup inválida, forzando backup...")
+        backup_now(paths)
+        return
+
+    diff = (today - last_date).days
+    print(f"[DEBUG] Días desde el último backup: {diff}")
+
+    if diff >= dias:
+        print(f"[DEBUG] Pasaron {diff} días, toca backup automático")
+        backup_now(paths)
+    else:
+        print(f"[DEBUG] Aún no toca backup (faltan {dias - diff} días)")

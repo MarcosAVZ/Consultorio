@@ -17,7 +17,7 @@ from paths import get_paths
 from db import init_db
 from validators import validar_campos
 from pdf_utils import generar_pdf
-from backup_drive import can_backup, backup_now
+from backup_drive import can_backup, backup_now , maybe_auto_backup
 
 
 
@@ -26,6 +26,7 @@ def app_main(page: ft.Page):
     paths = get_paths()
     conn, cur = init_db(paths["DB_NAME"])
     # Construye la interfaz y conecta handlers
+    maybe_auto_backup(paths) 
     make_app(page, conn, cur, paths)
 
 
